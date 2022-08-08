@@ -34,7 +34,7 @@ def challenge(username):
     data['callback'] = 'whatever'
     data['ip'] = get_ip()
     data['username'] = username
-    data['_'] = str(int(time.time()))
+    data['_'] = str(int(time.time()) + 100)
 
     get_str = urllib.parse.urlencode(data)
     get_str = get_str.encode('utf-8')
