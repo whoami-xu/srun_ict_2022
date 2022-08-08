@@ -32,7 +32,7 @@ def challenge(username):
     url = "https://gw.ict.ac.cn/cgi-bin/get_challenge"
     data = {}
     data['callback'] = 'whatever'
-    data['ip'] = socket.gethostbyname(socket.gethostname())
+    data['ip'] = get_ip()
     data['username'] = username
     data['_'] = str(int(time.time()))
 
@@ -185,7 +185,7 @@ def logout(username, password):
     # url="https://gw.ict.ac.cn/srun_portal_pc.php?ac_id=1&"
     url = "https://gw.ict.ac.cn/cgi-bin/srun_portal"
 
-    ip = socket.gethostbyname(socket.gethostname())
+    ip = get_ip()
     acid = "1"
 
     post_data = {}
