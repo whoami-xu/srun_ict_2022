@@ -1,0 +1,225 @@
+#!/usr/bin/python3
+
+from array import array
+import urllib.request
+import urllib.parse
+import hashlib
+import socket
+import base64
+import ctypes
+import json
+import time
+import hmac
+import math
+import sys
+import re
+
+# challenge
+def challenge(username):
+    url = "https://gw.ict.ac.cn/cgi-bin/get_challenge"
+    data = {}
+    data['callback'] = 'whatever'
+    data['ip'] = socket.gethostbyname(socket.gethostname())
+    data['username'] = username
+    data['_'] = str(int(time.time()))
+
+    get_str = urllib.parse.urlencode(data)
+    get_str = get_str.encode('utf-8')
+    req = urllib.request.urlopen(url, get_str)
+    res = req.read().decode("utf-8")
+
+    m = re.compile("\"challenge\"\:\"([0-9a-z]*)\"\,\"client_ip")
+    result = m.search(res)
+
+    ret = result.group(1) if result is not None else None
+    return ret
+
+def encode_userinfo(infodata, token):
+    def encode(string, key):
+        v = s(string, True)
+        k = s(key, False)
+        if (len(k) < 4):
+            pass # how to add undefined items to k array
+        n = len(v) - 1
+        z = v[n]
+        y = v[0]
+        c = ctypes.c_int((0x86014019 | 0x183639A0)).value
+        m = 0
+        e = 0
+        p = 0
+
+        q = math.floor(6 + 52 / (n + 1))
+        d = 0
+
+        while (q > 0):
+            q -= 1
+            d = ctypes.c_int(d + c & (0x8CE0D9BF | 0x731F2640)).value
+            e = ctypes.c_int(d >> 2 & 3).value
+
+            for p in range(0, n):
+                y = ctypes.c_int(v[p + 1]).value
+                m = ctypes.c_int(((z & 0xFFFFFFFF) >> 5) ^ ((y & 0xFFFFFFFF) << 2)).value
+                m += ctypes.c_int((y & 0xFFFFFFFF) >> 3 ^ (z & 0xFFFFFFFF) << 4 ^ (d ^ y)).value
+                m += ctypes.c_int(k[p & 3 ^ e] ^ z).value
+                z = v[p] = ctypes.c_int(v[p] + m).value
+
+            y = ctypes.c_int(v[0]).value
+            m = ctypes.c_int((z & 0xFFFFFFFF) >> 5 ^ (y & 0xFFFFFFFF) << 2).value
+            m += ctypes.c_int((y & 0xFFFFFFFF) >> 3 ^ (z & 0xFFFFFFFF) << 4 ^ (d ^ y)).value
+            m += ctypes.c_int(k[n & 3 ^ e] ^ z).value;
+            z = v[n] = ctypes.c_int(v[n] + m).value
+        return l(v, False)
+
+    def s(a, b):
+        c = len(a)
+        v = [0 for i in range(math.ceil(c / 4))];
+
+        for i in range(0, c, 4):
+            v[i >> 2] = ord(a[i]) | \
+                (ord(a[i + 1]) << 8 if i + 1 < c else 0) | \
+                (ord(a[i + 2]) << 16 if i + 2 < c else 0) | \
+                (ord(a[i + 3]) << 24 if i + 3 < c else 0)
+
+        if b:
+            v.append(c)
+
+        return v;
+
+    def l(a, b):
+        d = len(a)
+        c = d - 1 << 2
+
+        if (b):
+            m = a[d - 1]
+            if m < c - 3 or m > c:
+                return None
+            c = m
+
+        arr = []
+        for i in range(0, d):
+            # print(i)
+            arr += [a[i] & 0xff, a[i] >> 8 & 0xff, a[i] >> 16 & 0xff, a[i] >> 24 & 0xff] 
+            # a[i] = ''.join(map(chr, [a[i] & 0xff, a[i] >> 8 & 0xff, a[i] >> 16 & 0xff, a[i] >> 24 & 0xff]))
+            # print(a[i])
+
+        return arr
+
+
+    i = json.dumps(infodata, separators=(',', ':'))
+    base64_info = base64.b64encode(bytearray(encode(i, token))).decode('ascii')
+
+    orig_alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    alt_alpha  = "LVoJPiCN2R8G90yg+hmFHuacZ1OWMnrsSTXkYpUq/3dlbfKwv6xztjI7DeBE45QA"
+    return '{SRBX1}' + base64_info.translate(str.maketrans(orig_alpha, alt_alpha))
+
+
+
+# login
+def login(username, password, token):
+    url = "https://gw.ict.ac.cn/cgi-bin/srun_portal"
+
+    m = hmac.new(str.encode(token), password.encode("utf-8"), hashlib.md5)
+    psw = m.hexdigest()
+
+    ip = socket.gethostbyname(socket.gethostname())
+    acid = "1"
+    enc = 'srun_bx1'
+    n = 200
+    t = 1
+
+    userinfo = {
+            "username": username,
+            "password": password,
+            "ip": ip,
+            "acid": acid,
+            "enc_ver": enc
+            }
+    i = encode_userinfo(userinfo, token)
+
+    chk_str = token + username
+    chk_str += token + psw
+    chk_str += token + acid
+    chk_str += token + ip
+    chk_str += token + str(n)
+    chk_str += token + str(t) 
+    chk_str += token + i 
+
+    post_data = {}
+    post_data["callback"] = "jQuery112405428661654736844_1659689947354"
+    post_data['action'] = "login"
+    post_data['username'] = username
+    post_data['password'] = '{MD5}'+psw
+    # post_data['os'] = "Windows 10"
+    # post_data['name'] = "Windows"
+    post_data['double_stack'] = 0
+    post_data['chksum'] = hashlib.sha1(str.encode(chk_str)).hexdigest()
+    post_data['info'] = i
+    post_data['ac_id'] = acid
+    post_data['ip'] = ip
+    post_data['n'] = n
+    post_data['type'] = t 
+
+    post_str = urllib.parse.urlencode(post_data)
+    post_str = post_str.encode('utf-8')
+    req = urllib.request.urlopen(url, post_str)
+
+    return str(req.read())
+
+# logout
+def logout(username, password):
+    # url="http://159.226.39.22/srun_portal_pc.php?ac_id=1&"
+    # url="https://gw.ict.ac.cn/srun_portal_pc.php?ac_id=1&"
+    url = "https://gw.ict.ac.cn/cgi-bin/srun_portal"
+
+    ip = socket.gethostbyname(socket.gethostname())
+    acid = "1"
+
+    post_data = {}
+    post_data['action']="logout"
+    post_data['username'] = username
+    post_data['ip'] = ip
+    post_data['ac_id'] = acid
+
+    post_str = urllib.parse.urlencode(post_data)
+    # fullurl = url+"?"+post_str
+    req = urllib.request.urlopen(url)
+    return str(req.read())
+
+def usage():
+    sys.stdout.write("usage:\n\t" + sys.argv[0] + " [login|logout] [username] [password]\n")
+
+def main(argv):
+    if len(argv) == 2:
+        cmd = sys.argv[1]
+    elif len(argv) == 3:
+        cmd = sys.argv[1]
+        username = sys.argv[2]
+    elif len(argv) == 4:
+        cmd = sys.argv[1]
+        username = sys.argv[2]
+        password = sys.argv[3]
+    else:
+        usage()
+        return 1
+    if cmd == "login":
+        token = challenge(username)
+        rsp = login(username, password, token)
+        # sys.stdout.write(rsp + "\n")
+        # rsp = login(username, password)
+        pattern = re.compile("\"res\":\"ok\"")
+        ms = pattern.search(rsp)
+        if ms is not None:
+            # print(ms.group(0))
+            sys.stdout.write("login success!\n")
+        else:
+            sys.stdout.write(rsp + "\n")
+    elif cmd == "logout":
+        rsp = logout(username, password)
+        sys.stdout.write(rsp + "\n")
+    else:
+        usage()
+        return 1
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))
